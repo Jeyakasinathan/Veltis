@@ -17,6 +17,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.function.Supplier;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
@@ -188,6 +192,16 @@ public final class VeltisRuntime {
         return workspace;
     }
 
+    /**
+     * The lock that serialises rebuilds of this runtime artifact. It sits beside
+     * the artifact so it is scoped per home, per Minecraft version and per
+     * identity, and so the directory holding it is one the pipeline already
+     * creates on the building path.
+     */
+    private Path rebuildLockFile() {
+        return workspace.veltisServerJar().resolveSibling(".rebuild.lock");
+    }
+
     /** The identity of the runtime that is currently built, or was just built. */
     public RuntimeIdentity identity() {
         return identity;
@@ -307,11 +321,44 @@ public final class VeltisRuntime {
                     + " Validated {} in {}.",
                 workspace.veltisServerJar().getFileName(),
                 VeltisConsole.formatDuration(System.nanoTime() - started));
+            LOG.info("Veltis runtime ready in {} (warm start; cache hit)",
+                VeltisConsole.formatDuration(System.nanoTime() - started));
             return false;
         }
 
         workspace.createDirectories();
 
+        // One process at a time may rebuild this runtime artifact. The loser
+        // waits here, and the wait is the whole point: by the time it acquires
+        // the lock the winner's artifact is current, so a concurrent launch of
+        // the same server home re-validates instead of re-downloading and
+        // re-patching work that just finished — and it never writes into the
+        // same staging file that a live publish is using.
+        try (var rebuild = RebuildLock.acquire(rebuildLockFile())) {
+            var builtWhileWaiting = validateArtifact(patch.orElse(null), sourceRevision);
+            if (builtWhileWaiting.isPresent()) {
+                identity = builtWhileWaiting.get();
+                LOG.debug("Runtime became current while this process waited for the"
+                    + " rebuild lock; validated {} in {}.",
+                    workspace.veltisServerJar().getFileName(),
+                    VeltisConsole.formatDuration(System.nanoTime() - started));
+                LOG.info("Veltis runtime ready in {} (cold start, ready by a concurrent"
+                        + " launch; cache hit)",
+                    VeltisConsole.formatDuration(System.nanoTime() - started));
+                return false;
+            }
+            return buildMissing(patch, sourceRevision, checkout, sourcePatches, started);
+        } catch (IOException e) {
+            throw new PatchEngineException(
+                "[VeltisRuntime] Could not acquire the rebuild lock for "
+                    + workspace.veltisServerJar()
+                    + "\n  Reason: " + MojangMetadata.rootMessage(e), e);
+        }
+    }
+
+    private boolean buildMissing(Optional<BytecodePatch> patch, String sourceRevision,
+                                 boolean checkout, List<VeltisPatch> sourcePatches,
+                                 long started) {
         long phase = System.nanoTime();
         var metadata = new MojangMetadata().resolve(workspace, version);
         if (!metadata.id().equals(version.toString())) {
@@ -432,6 +479,8 @@ public final class VeltisRuntime {
                 ? " Build work tree removed; the installation now holds only"
                     + " Vanilla/ and Veltis/."
                 : "");
+        LOG.info("Veltis runtime ready in {} (cold start; cache miss, rebuilt)",
+            VeltisConsole.formatDuration(System.nanoTime() - started));
         return true;
     }
 
@@ -662,14 +711,57 @@ public final class VeltisRuntime {
     // ------------------------------------------------------------------
 
     private void fetchArtifacts(MojangMetadata.VersionMetadata metadata) {
-        var downloader = new MinecraftDownloader();
-        var server = downloader.downloadServer(metadata, workspace);
+        // The server jar and the library batch are independent artifacts on one
+        // aggregate-capped path: they cannot each go faster (parallel ranged
+        // segments measured no faster than one stream), but they no longer pay
+        // this phase's serialisation either — the library batch used to stand
+        // idle behind the whole server transfer. Each family gets its own
+        // downloader so a library failure can abort that client without killing
+        // the server transfer, and the server artifact keeps declared-order
+        // priority: its failure cancels the library batch, exactly like the
+        // sequential path, which fetched nothing when the server fetch failed.
+        var serverDownloader = new MinecraftDownloader();
+        var libraryDownloader = new MinecraftDownloader();
+        var executor = Executors.newFixedThreadPool(2, runnable -> {
+            var thread = new Thread(runnable, "veltis-artifact-fetch");
+            thread.setDaemon(true);
+            return thread;
+        });
+        MinecraftDownloader.Download server;
+        int fetched;
+        try {
+            Future<MinecraftDownloader.Download> serverFuture = executor.submit(
+                () -> serverDownloader.downloadServer(metadata, workspace));
+            Future<Integer> libraryFuture = executor.submit(
+                () -> libraryDownloader.downloadLibraries(metadata, workspace));
+            try {
+                server = serverFuture.get();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                libraryFuture.cancel(true);
+                throw new PatchEngineException(
+                    "[VeltisMinecraft] Artifact downloads interrupted", e);
+            } catch (ExecutionException e) {
+                libraryFuture.cancel(true);
+                throw failureOf(e);
+            }
+            try {
+                fetched = libraryFuture.get();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new PatchEngineException(
+                    "[VeltisMinecraft] Library downloads interrupted", e);
+            } catch (ExecutionException e) {
+                throw failureOf(e);
+            }
+        } finally {
+            executor.shutdownNow();
+        }
         if (server.outcome() != MinecraftDownloader.Outcome.CACHED) {
             VeltisConsole.bootstrap(
                 "Downloading vanilla " + metadata.id() + " server jar");
             LOG.debug("Server jar URL: {}", metadata.serverArtifact().url());
         }
-        int fetched = downloader.downloadLibraries(metadata, workspace);
         LOG.debug("Server artifact {} ({} bytes); {} librar{} present, {} fetched",
             server.outcome() == MinecraftDownloader.Outcome.CACHED
                 ? "already verified" : "downloaded and verified",
@@ -677,6 +769,19 @@ public final class VeltisRuntime {
             MinecraftDownloader.libraryJars(workspace).size(),
             MinecraftDownloader.libraryJars(workspace).size() == 1 ? "y" : "ies",
             fetched);
+    }
+
+    /** Unwraps a fetch task failure into the error the declaration raised. */
+    private PatchEngineException failureOf(ExecutionException e) {
+        var cause = e.getCause();
+        if (cause instanceof PatchEngineException patchEngine) {
+            return patchEngine;
+        }
+        if (cause != null && cause.getMessage() != null) {
+            return new PatchEngineException("[VeltisMinecraft] Failed to fetch the artifacts"
+                + "\n  Reason: " + cause.getMessage(), cause);
+        }
+        return new PatchEngineException("[VeltisMinecraft] Failed to fetch the artifacts", e);
     }
 
     private void widenAccess(MojangMetadata.VersionMetadata metadata) {
