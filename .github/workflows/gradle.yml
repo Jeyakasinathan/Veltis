@@ -11,13 +11,13 @@ name: VeltisMC CI
 #   5. notifies the website so its download page shows the same build.
 #
 # A release asset cannot keep its spaces: GitHub normalizes the file name it is
-# given (`Veltis 26.3 nightly aaa8824.jar` becomes
-# `Veltis.26.3.nightly.aaa8824.jar`). The metadata carries both the human name
+# given (`Veltis 26.3 pre-alpha aaa8824.jar` becomes
+# `Veltis.26.3.pre-alpha.aaa8824.jar`). The metadata carries both the human name
 # and the stored one, and the upload is verified against the release's own
 # asset list rather than against a name a release can never hold.
 #
 # The channel is never inferred from the commit or the branch. It comes from the
-# repository default (gradle.properties, currently nightly) or from the
+# repository default (gradle.properties, currently pre-alpha) or from the
 # dispatch input below.
 on:
   pull_request:
@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       channel:
-        description: "Release channel (pre-alpha, alpha, beta, release, stable, nightly); empty uses the repository default"
+        description: "Release channel (pre-alpha, alpha, beta, release); empty uses the repository default"
         required: false
         default: ""
         type: string
@@ -100,7 +100,7 @@ jobs:
           # Every invariant the release name and the website depend on, checked
           # here so a malformed metadata file can never reach the release step.
           jq -e '
-            (.channel | IN("pre-alpha", "alpha", "beta", "release", "stable", "nightly"))
+            (.channel | IN("pre-alpha", "alpha", "beta", "release"))
             and (.commit | test("^[0-9a-f]{40}$"))
             and (.shortCommit | test("^[0-9a-f]{7}$"))
             and (.shortCommit == (.commit[0:7]))
@@ -214,11 +214,11 @@ jobs:
 
           # One release per build, so the channel keeps a real history and the
           # asset URL is durable (Actions artifacts expire; releases do not).
-          # Every channel except the official release line (canonical `release`,
-          # or its retained earlier name `stable`) is marked prerelease so the
-          # website can tell them apart even if it only reads the releases API.
+          # The official release line (canonical `release`) is a full release;
+          # every other channel is marked prerelease so the website can tell them
+          # apart even if it only reads the releases API.
           PRERELEASE_FLAG=""
-          if [ "$CHANNEL" != "stable" ] && [ "$CHANNEL" != "release" ]; then PRERELEASE_FLAG="--prerelease"; fi
+          if [ "$CHANNEL" != "release" ]; then PRERELEASE_FLAG="--prerelease"; fi
 
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release edit "$TAG" \
