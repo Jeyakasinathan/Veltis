@@ -10,7 +10,7 @@ public interface Player extends CommandSender {
     boolean isOnline();
     void kick();
     void kick(String reason);
-    void kickJson()
+    void kickJson(String json);
     void sendMessage(String message);
     void sendMessageJson(String json);
 
