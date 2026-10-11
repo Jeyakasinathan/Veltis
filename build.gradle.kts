@@ -51,18 +51,19 @@ val minecraftVersion = providers.gradleProperty("minecraftVersion")
 // ---------------------------------------------------------------------------
 // Release channel
 //
-// The authoritative value lives in gradle.properties (channel=nightly). Use
+// The authoritative value lives in gradle.properties (channel=pre-alpha). Use
 // -Pchannel=release on the command line to override it for one run. Validated
 // against the known channel names so a typo fails the configuration phase
 // rather than silently publishing under an invented name. `release` is the
-// official channel; `stable` is its retained earlier name and `nightly` is a
-// channel of its own, never renamed.
+// official channel; the retired `nightly` name is gone and `stable` survives
+// only as a read-time alias for `release` on the website, never as a build
+// channel.
 // ---------------------------------------------------------------------------
 val channel = providers.gradleProperty("channel")
     .orElse("pre-alpha")
     .get()
     .also { ch ->
-        val validChannels = setOf("pre-alpha", "alpha", "beta", "release", "stable", "nightly")
+        val validChannels = setOf("pre-alpha", "alpha", "beta", "release")
         require(ch in validChannels) {
             "Invalid release channel '$ch'. Supported values: ${validChannels.joinToString()}"
         }
@@ -125,7 +126,7 @@ val shortSha: String by lazy { gitSha.take(7) }
 //   * the local distribution is always `build/distributions/veltis.jar`. It is
 //     a constant: a script that starts a server, the website README and an
 //     operator's notes must not have to know the channel or the commit, and the
-//     same path has to serve a stable, a beta and a nightly build.
+//     same path has to serve a pre-alpha, a beta and a release build.
 //
 //   * the GitHub Actions upload is `Veltis <MinecraftVersion> <Channel>
 //     <7-char-SHA>.jar`. Spaces are intentional and required; do not
@@ -148,8 +149,8 @@ fun releaseArtifactName(): String = "Veltis $minecraftVersion $channel $shortSha
  * <p>A release never keeps the exact name it is handed: the platform normalizes
  * every uploaded asset's file name by replacing each run of characters outside
  * `[A-Za-z0-9_+@-]` with a dot and trimming the result, so
- * `Veltis 26.3 nightly aaa8824.jar` is stored and served as
- * `Veltis.26.3.nightly.aaa8824.jar`. `gh release upload` does not change this:
+ * `Veltis 26.3 pre-alpha aaa8824.jar` is stored and served as
+ * `Veltis.26.3.pre-alpha.aaa8824.jar`. `gh release upload` does not change this:
  * it mirrors the same rule only so `--clobber` can recognize an asset it has
  * already uploaded.
  *
@@ -1193,7 +1194,7 @@ val prepareMinecraft by tasks.registering {
  * The distributable: the launcher, with no Minecraft code inside it.
  *
  * <p>Exactly one file, always `build/distributions/veltis.jar`. The name is a
- * constant on purpose: a stable, a beta and a nightly build all land on the same
+ * constant on purpose: pre-alpha, beta and release builds all land on the same
  * path, an operator's start script never has to know the channel, and no
  * consumer of the distribution can mistake a versioned filename for a second
  * artifact. The channel- and commit-qualified name exists only for the GitHub
@@ -1254,7 +1255,7 @@ val packageVeltisMC by tasks.registering {
  * anyone who needs to know what a build produced without unpacking it.
  *
  * <p>Every value comes from the same root declarations the filename comes from,
- * so `-Pchannel=nightly` changes both and they cannot disagree about the commit,
+ * so `-Pchannel=pre-alpha` changes both and they cannot disagree about the commit,
  * the Minecraft version or the artifact. It is pure JSON rather than a
  * properties file because that is what the site reads.
  */
