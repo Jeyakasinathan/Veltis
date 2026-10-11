@@ -6,7 +6,6 @@ import org.veltismc.runtime.api.WorldDefinition;
 import org.veltismc.runtime.internal.InternalChunk;
 import org.veltismc.runtime.model.world.InternalWorld;
 import org.veltismc.runtime.internal.InternalEntity;
-import org.veltismc.runtime.internal.InternalPlayer;
 import org.veltismc.runtime.model.world.WorldProperties;
 
 import java.util.Collection;
@@ -201,11 +200,6 @@ public final class DefaultWorldContainer implements WorldContainer {
 
         @Override
         public <T extends InternalEntity> Collection<T> entities(Class<T> type) { return List.of(); }
-
-        @Override
-        public Optional<InternalPlayer> nearestPlayer(double x, double y, double z, double radius) {
-            return Optional.empty();
-        }
     }
 }
 

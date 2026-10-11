@@ -3,7 +3,6 @@ package org.veltismc.runtime.model.world;
 import org.veltismc.runtime.model.chunk.ChunkPosition;
 import org.veltismc.runtime.model.chunk.InternalChunk;
 import org.veltismc.runtime.model.entity.InternalEntity;
-import org.veltismc.runtime.model.player.InternalPlayer;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -113,21 +112,6 @@ public interface InternalWorld {
      * All entities of the given type.
      */
     <T extends InternalEntity> Collection<T> entities(Class<T> type);
-
-    /**
-     * All players currently in this world.
-     */
-    Collection<? extends InternalPlayer> players();
-
-    /**
-     * Finds the nearest player within the given radius.
-     */
-    Optional<InternalPlayer> nearestPlayer(double x, double y, double z, double radius);
-
-    /**
-     * Stream of all players in this world.
-     */
-    Stream<? extends InternalPlayer> playerStream();
 }
 
 

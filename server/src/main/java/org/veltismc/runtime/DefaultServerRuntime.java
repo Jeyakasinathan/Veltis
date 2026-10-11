@@ -1,8 +1,6 @@
 package org.veltismc.runtime;
 
-import org.veltismc.runtime.container.DefaultPlayerContainer;
 import org.veltismc.runtime.container.DefaultWorldContainer;
-import org.veltismc.runtime.container.PlayerContainer;
 import org.veltismc.runtime.container.WorldContainer;
 import org.veltismc.runtime.event.EventBus;
 import org.veltismc.runtime.event.SimpleEventBus;
@@ -31,7 +29,6 @@ public final class DefaultServerRuntime implements ServerRuntime {
     private final EventBus eventBus;
     private final ServiceRegistry services;
     private final LifecycleManager lifecycle;
-    private final PlayerContainer players;
     private final WorldContainer worlds;
     private final WorldEngine worldEngine;
 
@@ -42,7 +39,6 @@ public final class DefaultServerRuntime implements ServerRuntime {
         this.eventBus = new SimpleEventBus();
         this.scheduler = new DefaultTaskScheduler();
         this.tickEngine = new DefaultTickEngine();
-        this.players = new DefaultPlayerContainer();
         this.worlds = new DefaultWorldContainer();
         WorldEngineService worldEngineService = new WorldEngineService();
         this.worldEngine = worldEngineService.engine();
@@ -155,11 +151,6 @@ public final class DefaultServerRuntime implements ServerRuntime {
     @Override
     public LifecycleManager lifecycle() {
         return lifecycle;
-    }
-
-    @Override
-    public PlayerContainer players() {
-        return players;
     }
 
     @Override
