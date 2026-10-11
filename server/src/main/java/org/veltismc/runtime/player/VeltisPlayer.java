@@ -120,7 +120,18 @@ public final class VeltisPlayer implements Player {
             return;
         var p = handle();
         if (p != null)
-            p.connection.disconnect(Component.literal(reason));
+            kick(Component.literal(reason));
+    }
+
+    
+    @Override
+    public void kickJson(String json) {
+        if (json == null)
+            return;
+        var p = handle();
+        Component component = ComponentJson.parse(server, json);
+        if (p != null)
+            kick(component);
     }
 
     public void kick(Component component) {
