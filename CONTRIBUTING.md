@@ -42,6 +42,7 @@ Build the project:
 
 ```text
 Veltis/
+├── veltis-api/
 ├── launcher/
 ├── patch-engine/
 ├── server/
@@ -55,6 +56,11 @@ Veltis/
 ```
 
 ### Modules
+
+**`veltis-api`**
+
+The stable surface other modules and external integrations compile against. It is
+a boundary even while it holds no classes.
 
 **`launcher`**
 

@@ -920,6 +920,42 @@ class GradlePipelineTest {
     }
 
     /**
+     * The Paper configuration mirror is gone, not merely dormant.
+     *
+     * <p>An earlier build shipped a reflective copy of Paper's
+     * {@code paper-global.yml} / {@code paper-world-defaults.yml} that wrote
+     * {@code config/veltis-global.yml} and
+     * {@code config/veltis-world-defaults.yml} on first start. No runtime code
+     * ever read a value from it; the world engine has its own validated
+     * {@code WorldConfig}. The parser and its only dependency were removed, so
+     * this pins the removal: neither the class, nor SnakeYAML, nor a reference
+     * to the parser may return unnoticed.
+     */
+    @Test
+    void thePaperStyleConfigParserIsGone() {
+        assertFalse(Files.exists(REPO.resolve(
+                "server/src/main/java/org/veltismc/runtime/config/VeltisConfig.java")),
+            "the Paper configuration mirror must not come back: nothing consumed it");
+        for (var script : List.of("server/build.gradle.kts", "launcher/build.gradle.kts")) {
+            assertFalse(read(script).contains("snakeyaml"),
+                script + " still declares SnakeYAML, which only the retired parser used");
+        }
+        for (var source : javaFiles("server/src/main/java")) {
+            assertFalse(read(source).contains("VeltisConfig"),
+                source + " still references the retired configuration parser");
+        }
+        assertTrue(read("server/src/main/java/org/veltismc/runtime/VeltisBootstrap.java")
+                .contains("LegacyConfig.warnIfPresent"),
+            "startup must report a retired configuration file rather than read it");
+        for (var entry : distributableEntries()) {
+            assertFalse(entry.endsWith("veltis-global.yml")
+                    || entry.endsWith("veltis-world-defaults.yml")
+                    || entry.endsWith("veltis-world-defults.yml"),
+                "the distributable must not package a retired configuration file: " + entry);
+        }
+    }
+
+    /**
      * The retired state directory must be gone from every file that builds or
      * runs the thing, not merely unused.
      *
