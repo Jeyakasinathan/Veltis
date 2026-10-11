@@ -33,8 +33,9 @@ dependencies {
     implementation("org.apache.logging.log4j:log4j-api:2.26.0")
     implementation("org.apache.logging.log4j:log4j-jul:2.26.0")
 
-    // The world engine's configuration and the framework's own parsing.
-    implementation("org.yaml:snakeyaml:2.4")
+    // The JSON parser `MojangMetadata` resolves Mojang's version document with;
+    // it has to be on the server runtime classpath the bootstrap table is built
+    // from, not only on the launcher's.
     implementation("com.google.code.gson:gson:2.14.0")
 
     // The class-file parser the runtime delta applier needs: applying a patch

@@ -21,8 +21,8 @@ import java.util.List;
 /**
  * Stage 0: make this jar's own dependencies exist before anything looks one up.
  *
- * <p>{@code veltismc.jar} carries no third-party code. Log4j, Gson and SnakeYAML
- * are named in its manifest {@code Class-Path} as {@code libraries/<maven path>}
+ * <p>{@code veltismc.jar} carries no third-party code. Log4j, Gson and ASM are
+ * named in its manifest {@code Class-Path} as {@code libraries/<maven path>}
  * entries, which the JVM resolves lazily and relative to the jar. "Lazily" is
  * the whole problem: the first lookup of a missing {@code Class-Path} entry
  * fails <em>and the failure is cached</em>, so a class that would have been

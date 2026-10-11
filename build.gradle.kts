@@ -51,16 +51,18 @@ val minecraftVersion = providers.gradleProperty("minecraftVersion")
 // ---------------------------------------------------------------------------
 // Release channel
 //
-// The authoritative value lives in gradle.properties (channel=stable). Use
-// -Pchannel=nightly on the command line to override it for one run. Validated
+// The authoritative value lives in gradle.properties (channel=nightly). Use
+// -Pchannel=release on the command line to override it for one run. Validated
 // against the known channel names so a typo fails the configuration phase
-// rather than silently publishing under an invented name.
+// rather than silently publishing under an invented name. `release` is the
+// official channel; `stable` is its retained earlier name and `nightly` is a
+// channel of its own, never renamed.
 // ---------------------------------------------------------------------------
 val channel = providers.gradleProperty("channel")
-    .orElse("stable")
+    .orElse("pre-alpha")
     .get()
     .also { ch ->
-        val validChannels = setOf("stable", "beta", "nightly")
+        val validChannels = setOf("pre-alpha", "alpha", "beta", "release", "stable", "nightly")
         require(ch in validChannels) {
             "Invalid release channel '$ch'. Supported values: ${validChannels.joinToString()}"
         }

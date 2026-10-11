@@ -26,7 +26,6 @@ public final class VeltisBootstrap {
     private static final Logger LOG = LogManager.getLogger(VeltisBootstrap.class);
 
     private static boolean booted;
-    private static Path homeDir;
 
     public static volatile Object MINECRAFT_SERVER;
 
@@ -39,12 +38,13 @@ public final class VeltisBootstrap {
         if (booted) return;
         booted = true;
 
-        homeDir = detectHomeDirectory(args);
-        try {
-            org.veltismc.runtime.config.VeltisConfig.load(homeDir);
-        } catch (Exception e) {
-            LOG.warn("Config load failed: {}", e.getMessage());
-        }
+        // An installation that was once started by an earlier build may still
+        // hold the retired Paper-style configuration files. They are reported
+        // once and then left alone: nothing is read, nothing is required, and
+        // nothing is deleted. See LegacyConfig for why there is nothing to
+        // migrate.
+        var home = detectHomeDirectory(args);
+        org.veltismc.runtime.config.LegacyConfig.warnIfPresent(home, LOG);
     }
 
     public static void onMinecraftServerCreated(Object server) {

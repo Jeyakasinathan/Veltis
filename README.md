@@ -175,6 +175,34 @@ Veltis obtains the required Minecraft server files from Mojang, verifies them, p
 
 Minecraft itself is not redistributed with Veltis.
 
+## Configuration
+
+Veltis does not reproduce Paper's configuration layout. There are two sources of
+configuration, and each setting has exactly one owner:
+
+- **`server.properties`** — Minecraft's own server settings, created by the
+  server on first start exactly as vanilla creates it. Veltis does not mirror it.
+- **`WorldConfig`** (`org.veltismc.world.api.WorldConfig`) — every Veltis world
+  engine setting: region size, worker pool, simulation tick interval, random
+  ticks, section bounds, world seed, and the save and object-pool limits. It is a
+  validated record with explicit defaults (`WorldConfig.defaults()`), and its
+  constructor rejects an out-of-range value instead of storing it. One
+  engine-wide default serves every world, and
+  `WorldEngine.createWorld(name, config)` overrides it for a single world.
+
+`WorldEngineService` builds the engine from `WorldConfig.defaults()`, and the
+Minecraft-facing integration binds one Veltis world per `ServerLevel`. No other
+layer decides what those values are.
+
+Earlier builds wrote two Paper-style files,
+`config/veltis-global.yml` and `config/veltis-world-defaults.yml`, plus a
+per-world `veltis-world.yml`. No runtime code ever read a value from them — the
+engine has always taken its settings from `WorldConfig` — so the parser and the
+files it generated were removed. A start that finds an installed copy reports
+each file once as obsolete and carries on: the files are left untouched and can
+be deleted, nothing must exist for the server to start, and no setting was
+migrated because none of them reached the runtime.
+
 ## Releases
 
 `.github/workflows/gradle.yml` builds and tests every pull request and every

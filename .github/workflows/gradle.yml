@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       channel:
-        description: "Release channel (stable, beta, nightly); empty uses the repository default"
+        description: "Release channel (pre-alpha, alpha, beta, release, stable, nightly); empty uses the repository default"
         required: false
         default: ""
         type: string
@@ -100,7 +100,7 @@ jobs:
           # Every invariant the release name and the website depend on, checked
           # here so a malformed metadata file can never reach the release step.
           jq -e '
-            (.channel | IN("stable", "beta", "nightly"))
+            (.channel | IN("pre-alpha", "alpha", "beta", "release", "stable", "nightly"))
             and (.commit | test("^[0-9a-f]{40}$"))
             and (.shortCommit | test("^[0-9a-f]{7}$"))
             and (.shortCommit == (.commit[0:7]))
@@ -110,7 +110,7 @@ jobs:
             and (.artifact == ("Veltis " + .minecraftVersion + " " + .channel + " " + .shortCommit + ".jar"))
             and (.assetName | length > 0)
             and (.assetName | test("^[A-Za-z0-9_+@.-]+$"))
-            and (.assetName == (.artifact | gsub(" "; ".")))
+            and (.assetName == (.artifact | gsub("[^A-Za-z0-9_+@-]+"; ".") | gsub("\\.{2,}"; ".") | sub("^\\.+"; "") | sub("\\.+$"; "")))
           ' "$META" > /dev/null || {
             echo "::error::$META does not describe a valid Veltis release"
             cat "$META"
@@ -214,10 +214,11 @@ jobs:
 
           # One release per build, so the channel keeps a real history and the
           # asset URL is durable (Actions artifacts expire; releases do not).
-          # Non-stable channels are marked prerelease so the website can tell
-          # them apart even if it only reads the releases API.
+          # Every channel except the official release line (canonical `release`,
+          # or its retained earlier name `stable`) is marked prerelease so the
+          # website can tell them apart even if it only reads the releases API.
           PRERELEASE_FLAG=""
-          if [ "$CHANNEL" != "stable" ]; then PRERELEASE_FLAG="--prerelease"; fi
+          if [ "$CHANNEL" != "stable" ] && [ "$CHANNEL" != "release" ]; then PRERELEASE_FLAG="--prerelease"; fi
 
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release edit "$TAG" \

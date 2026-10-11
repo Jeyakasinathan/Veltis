@@ -61,14 +61,14 @@ val centralLibraryBase = "https://repo1.maven.org/maven2/"
 /**
  * Everything the launcher jar puts on the JVM's system classpath, and why.
  *
- * Seven entries, and the count is the point. Each one is reachable from the
+ * Six entries, and the count is the point. Each one is reachable from the
  * server's own start-up path — Log4j because `VeltisConsole` configures it
  * before anything logs, Gson because `MojangMetadata` parses Mojang's version
  * document with it, the JUL bridge because the server installs Log4j's
- * `LogManager` as `java.util.logging.manager`, SnakeYAML because `VeltisConfig`
- * reads `veltis.yml`, and ASM because applying the bytecode patch set splices
- * class deltas onto the verified vanilla classes with `ClassDelta`, which parses
- * both sides to do it. Nothing else in the build's runtime classpath is used by
+ * `LogManager` as `java.util.logging.manager`, and ASM because applying the
+ * bytecode patch set splices class deltas onto the verified vanilla classes
+ * with `ClassDelta`, which parses both sides to do it. Nothing else in the
+ * build's runtime classpath is used by
  * the running server, so nothing else is listed: Vineflower decompiles at build
  * time and `javax.tools` compiles at build time, and neither is present in the
  * jar at all.
@@ -90,8 +90,6 @@ val bootstrapCoordinates = listOf(
     // `java.util.logging.manager`, which the server installs into a JVM that
     // would otherwise fall back to the JDK's SimpleLog formatter.
     "org.apache.logging.log4j:log4j-jul",
-    // `veltis.yml`. Mojang does not publish this one.
-    "org.yaml:snakeyaml",
     // The class-file reader and writer the delta applier parses both sides of
     // a splice with: vanilla class in, merged class out.
     "org.ow2.asm:asm",
@@ -229,8 +227,8 @@ val writeBootstrapLibraries by tasks.registering {
                 appendLine("# listed here beside the jar under libraries/, and refuses to start")
                 appendLine("# unless each one hashes to the value recorded on its row.")
                 appendLine("#")
-                appendLine("# The jar itself contains no third-party code, so these five files")
-                appendLine("# are the only place a Log4j, Gson or SnakeYAML class comes from.")
+                appendLine("# The jar itself contains no third-party code, so these files")
+                appendLine("# are the only place a Log4j, Gson or ASM class comes from.")
                 rows.forEach { (path, url, sha1) ->
                     append(path).append('\t').append(url).append('\t').append(sha1)
                     appendLine()
