@@ -21,6 +21,8 @@ description = "VeltisMC server: the NMS entrypoint, the Veltis runtime framework
 // definition of it. Nothing here reaches into the workspace directly.
 
 dependencies {
+    // For the Veltis API
+    implementation(project(":veltis-api"))
     // Console/logging bootstrap (VeltisConsole) shared with the launcher:
     // Log4j2 configuration plus UTF-8/ANSI console setup — no Jansi, which on
     // JDK 26 prints restricted native-access warnings that cannot be fixed

@@ -40,8 +40,6 @@ public interface InternalWorld {
 
     <T extends InternalEntity> Collection<T> entities(Class<T> type);
 
-    Optional<InternalPlayer> nearestPlayer(double x, double y, double z, double radius);
-
     record Envelope(
         int minY,
         int maxY,

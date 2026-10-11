@@ -1,6 +1,4 @@
 package org.veltismc.runtime;
-
-import org.veltismc.runtime.container.PlayerContainer;
 import org.veltismc.runtime.container.WorldContainer;
 import org.veltismc.runtime.event.EventBus;
 import org.veltismc.runtime.lifecycle.LifecycleManager;
@@ -34,8 +32,6 @@ public interface ServerRuntime {
     ServiceRegistry services();
 
     LifecycleManager lifecycle();
-
-    PlayerContainer players();
 
     WorldContainer worlds();
 
