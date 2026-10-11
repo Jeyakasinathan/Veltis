@@ -1,23 +1,19 @@
 # Contributing to Veltis
 
-Thanks for contributing to Veltis.
+Thanks for your interest in contributing to Veltis.
 
-Veltis is an open-source Minecraft server project maintained under the VeltisMC organization. Contributions are welcome, whether you're fixing a bug, improving performance, working on the world engine, improving Shulker, or improving the documentation.
+Contributions to bug fixes, performance, world simulation, Shulker, and documentation are welcome.
 
 ## Requirements
 
-You'll need:
-
 - JDK 26
 - Git
-- An internet connection for the initial Minecraft/dependency setup
-- IntelliJ IDEA or another Java IDE
+- Internet access for initial setup
+- A Java IDE (IntelliJ IDEA recommended)
 
-You don't need to install Gradle separately. The repository includes the Gradle wrapper.
+Gradle is included through the repository wrapper.
 
-## Getting started
-
-Clone the repository:
+## Setup
 
 ```bash
 git clone https://github.com/VeltisMC/Veltis.git
@@ -26,19 +22,19 @@ cd Veltis
 
 Build the project:
 
-### Windows
+**Windows**
 
 ```powershell
 .\gradlew.bat buildVeltisMC
 ```
 
-### Linux / macOS
+**Linux / macOS**
 
 ```bash
 ./gradlew buildVeltisMC
 ```
 
-## Project structure
+## Project Structure
 
 ```text
 Veltis/
@@ -55,50 +51,13 @@ Veltis/
 └── settings.gradle.kts
 ```
 
-### Modules
-
-**`veltis-api`**
-
-The stable surface other modules and external integrations compile against. It is
-a boundary even while it holds no classes.
-
-**`launcher`**
-
-The application entry point and distribution.
-
-**`patch-engine`**
-
-Handles the Minecraft preparation and patching pipeline.
-
-**`server`**
-
-Contains the Veltis server runtime, world engine, and Minecraft-facing code.
-
-**`server/Shulker`**
-
-Contains the patches used to modify Minecraft.
-
-Keep the module structure simple. A new module should have a clear technical reason to exist.
+Keep the existing module structure unless a new module has a clear technical purpose.
 
 ## Working with Shulker
 
-Minecraft source changes belong in Shulker.
+Minecraft source modifications belong in `server/Shulker`.
 
-The usual workflow is:
-
-```text
-Apply patches
-    ↓
-Make changes
-    ↓
-Rebuild patches
-    ↓
-Build and test
-    ↓
-Review the patch
-```
-
-Apply the patches:
+Apply patches:
 
 ```bash
 ./gradlew applyPatches
@@ -110,207 +69,108 @@ On Windows:
 .\gradlew.bat applyPatches
 ```
 
-Make your changes in:
-
-```text
-minecraft/workspace/<version>/patched/
-```
-
-Rebuild the patches:
+Make changes in the patched Minecraft workspace, following the repository's generated workspace path. Rebuild the patches:
 
 ```bash
 ./gradlew rebuildPatches
 ```
 
-Then review the result:
+Review your changes:
 
 ```bash
 git diff -- server/Shulker
 ```
 
-Do not make direct changes to the pristine Minecraft source tree.
+Do not edit the pristine Minecraft source tree directly. Keep patches focused, descriptive, and logically separated. Do not manually renumber existing patches.
 
-## Patch categories
+## Performance Guidelines
 
-Shulker is organized into:
+Veltis prioritizes performance without sacrificing correctness.
 
-```text
-server/Shulker/
-├── code/
-├── data/
-└── modules/
-```
+Before submitting an optimization, consider:
 
-Keep changes in the category they belong to.
+- Does it reduce measurable work?
+- Does it reduce allocations or improve memory access?
+- Can it safely run concurrently?
+- Does it preserve Minecraft behavior?
+- Can the improvement be demonstrated through profiling or benchmarks?
 
-Minecraft modifications should not be implemented through a separate patching mechanism.
+Avoid unnecessary threads, dependencies, abstractions, and repeated work.
 
-## Patch naming
-
-Use short, descriptive names:
-
-```text
-001-Fix-Hopper-Lookup.patch
-002-Improve-Chunk-Ticking.patch
-003-Add-Veltis-Bootstrap.patch
-```
-
-Patch numbering is managed by the patch workflow. Don't manually create gaps or renumber the existing patch set.
-
-## Performance changes
-
-Performance is an important part of Veltis, but faster code is not automatically better code.
-
-Before submitting a performance change, consider:
-
-- What work is being removed or reduced?
-- How often does the code run?
-- Does it reduce allocations?
-- Does it improve cache or memory behavior?
-- Can the work safely run concurrently?
-- Does it change vanilla behavior?
-- Can the improvement be measured?
-
-Avoid adding threads simply because something can technically run in parallel.
-
-Veltis aims for aggressive multithreading where it is safe and useful. World state and gameplay logic must remain correct.
-
-For meaningful performance changes, include benchmark or profiling results in the pull request.
+World state and gameplay logic must remain correct under concurrent execution.
 
 ## Testing
 
-Before opening a pull request, run at least:
+Before submitting a pull request, run:
 
 ```bash
 ./gradlew clean buildVeltisMC
 ```
 
-If your change affects Shulker, also verify that the patches apply cleanly.
+On Windows:
 
-For patch changes, check that rebuilding the patch set produces the expected result and does not introduce unrelated changes.
+```powershell
+.\gradlew.bat clean buildVeltisMC
+```
 
-Test the actual affected functionality whenever possible.
+Also run relevant tests and verify the affected functionality.
 
-## Pull requests
+For Shulker changes, ensure patches apply cleanly and rebuilding them does not introduce unrelated modifications.
 
-Keep pull requests focused.
+For performance changes, include benchmark or profiling results when available.
 
-A good pull request should explain:
+## Code Style
 
-- What changed
-- Why it changed
-- How it was tested
-- Any performance impact
-- Any compatibility or behavior changes
-
-Avoid unrelated formatting changes or drive-by refactoring.
-
-Large architectural changes should be discussed before implementation when possible.
-
-## Code style
-
-Follow the style of the surrounding code.
+Follow the surrounding code and existing project conventions.
 
 Prefer:
 
-- Simple implementations
 - Clear names
 - Small, focused changes
-- Existing project patterns
+- Simple implementations
 - Minimal dependencies
+- Explicit error handling
 
 Avoid:
 
 - Unnecessary abstractions
-- Large utility classes
-- Manager/Service/Controller chains without a real need
-- Keeping dead code "just in case"
-- Adding dependencies for functionality the JDK or existing code already provides
+- Large utility classes without a clear purpose
+- Redundant manager/service layers
+- Dead code
+- Unnecessary dependency shading
 
-## Dependencies
+## Pull Requests
 
-Keep runtime dependencies small.
+Keep pull requests focused. Explain:
 
-Before adding a dependency, consider whether:
+1. What changed.
+2. Why the change is needed.
+3. How it was tested.
+4. Any performance impact.
+5. Any compatibility or behavior changes.
 
-1. The functionality is actually required.
-2. The JDK already provides it.
-3. Minecraft already provides an equivalent dependency.
-4. It is build-time only.
-5. The additional maintenance cost is justified.
+Discuss substantial changes to the architecture, threading model, patch system, or public API before implementing them.
 
-Do not bundle or shade dependencies without a specific reason.
+## Documentation
 
-## Minecraft changes
+Document non-obvious behavior, design decisions, assumptions, and limitations. Comments should explain why an implementation exists when the code alone is insufficient.
 
-Changes to Minecraft belong in:
+## Reporting Bugs
 
-```text
-server/Shulker/
-```
-
-Keep patches focused and logically separated.
-
-If multiple changes are unrelated, split them into separate patches rather than creating one large patch.
-
-## Commit messages
-
-Keep commit messages short and descriptive.
-
-Examples:
-
-```text
-fix: prevent unnecessary hopper searches
-perf: reduce chunk ticking overhead
-patch: improve server bootstrap
-build: clean runtime dependencies
-docs: update contribution guide
-```
-
-## Reporting bugs
-
-When reporting a bug, include:
+Include:
 
 - Veltis version or commit
 - Minecraft version
 - Java version
 - Operating system
 - Steps to reproduce
-- Expected behavior
-- Actual behavior
+- Expected and actual behavior
 - Relevant logs or stack traces
 
-For performance issues, include profiling or benchmark information when available.
-
-## Contributing to discussions
-
-For major changes to the architecture, threading model, patch system, or public APIs, open a discussion or issue before doing substantial implementation work.
-
-This helps avoid spending time on an approach that may conflict with the direction of Veltis.
-
-## Documentation and comments
-
-Contributions must include proper documentation or comments for the work being done.
-
-Document code when the purpose, behavior, or reasoning behind an implementation is not immediately obvious.
-
-For larger changes, explain:
-
-- What the code does
-- Why it is implemented that way
-- Any important assumptions or limitations
-- Any non-obvious behavior future contributors should know
-
-Avoid unnecessary comments that simply restate what the code already says. Comments should explain the **why** when the code alone cannot make it clear.
+For performance issues, include profiling or benchmark results when available.
 
 ## License
 
-Veltis is licensed under the GNU General Public License v3.0.
-
-By contributing to Veltis, you agree that your contributions will be licensed under the same license.
-
----
-
-Veltis is actively developed, so parts of the codebase and development workflow may change over time.
+Veltis is licensed under the GNU General Public License v3.0. Contributions are expected to be submitted under the same license.
 
 Thanks for helping build Veltis.

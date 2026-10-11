@@ -14,6 +14,10 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * Materialises Mojang's artifacts into the workspace, verified.
@@ -47,19 +51,39 @@ public final class MinecraftDownloader {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration DOWNLOAD_TIMEOUT = Duration.ofMinutes(10);
 
+    /**
+     * How many library files are fetched at once. Bounded on purpose: hitting
+     * Mojang's CDN with a whole deployment's library list at once is rude, and
+     * the sequential path is what made a cold start spend ~20s on round trips.
+     */
+    public static final int DEFAULT_CONCURRENCY = 8;
+
     private final HttpClient client;
+    private final int maxConcurrent;
     private static final org.apache.logging.log4j.Logger log =
         org.apache.logging.log4j.LogManager.getLogger(MinecraftDownloader.class);
 
     public MinecraftDownloader() {
-        this(HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .connectTimeout(CONNECT_TIMEOUT)
-            .build());
+        this(defaultClient(), DEFAULT_CONCURRENCY);
     }
 
     public MinecraftDownloader(HttpClient client) {
+        this(client, DEFAULT_CONCURRENCY);
+    }
+
+    public MinecraftDownloader(HttpClient client, int maxConcurrent) {
         this.client = Objects.requireNonNull(client, "client cannot be null");
+        if (maxConcurrent < 1) {
+            throw new IllegalArgumentException("maxConcurrent must be at least 1");
+        }
+        this.maxConcurrent = maxConcurrent;
+    }
+
+    private static HttpClient defaultClient() {
+        return HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .connectTimeout(CONNECT_TIMEOUT)
+            .build();
     }
 
     /** What a single artifact fetch did. */
@@ -93,6 +117,16 @@ public final class MinecraftDownloader {
      * Fetches every declared library, verified, preserving Mojang's layout under
      * {@link VeltisWorkspace#librariesDirectory()}.
      *
+     * <p>Libraries are independent, immutable artifacts: none of them depends on
+     * another, and each is verified against its own published SHA-1 before it is
+     * promoted. Downloading them concurrently is therefore safe — a failure in
+     * one cannot corrupt or invalidate another — and it is how a cold start
+     * stops paying a full HTTPS round trip per library. The pool is bounded by
+     * {@link #maxConcurrent}. Failures keep the sequential path's contract:
+     * the first failure (in Mojang's declared order) is reported with the same
+     * URL + expected/actual SHA-1 evidence, every in-flight transfer is
+     * cancelled, and nothing unverified ever reaches the workspace.
+     *
      * @return the number of files actually fetched (recoveries count as fetched)
      */
     public int downloadLibraries(MojangMetadata.VersionMetadata metadata, VeltisWorkspace workspace) {
@@ -103,14 +137,72 @@ public final class MinecraftDownloader {
             throw new PatchEngineException(
                 "[VeltisMinecraft] Failed to create the library directory " + libraryRoot, e);
         }
-        var fetched = 0;
-        for (var library : metadata.libraries()) {
-            var target = resolveInside(libraryRoot, library.artifact().path());
-            if (fetch(library.artifact(), target, library.name()).outcome() != Outcome.CACHED) {
-                fetched++;
+        var libraries = metadata.libraries();
+        var poolSize = Math.max(1, Math.min(maxConcurrent, libraries.size()));
+        var executor = Executors.newFixedThreadPool(poolSize, runnable -> {
+            var thread = new Thread(runnable, "veltis-library-download");
+            thread.setDaemon(true);
+            return thread;
+        });
+        var completion = new ExecutorCompletionService<Boolean>(executor);
+        var futures = new ArrayList<Future<Boolean>>(libraries.size());
+        for (var library : libraries) {
+            futures.add(completion.submit(() -> {
+                var target = resolveInside(libraryRoot, library.artifact().path());
+                return fetch(library.artifact(), target, library.name()).outcome() != Outcome.CACHED;
+            }));
+        }
+
+        int fetched = 0;
+        PatchEngineException failure = null;
+        try {
+            for (int i = 0; i < libraries.size() && failure == null; i++) {
+                try {
+                    if (completion.take().get()) {
+                        fetched++;
+                    }
+                } catch (ExecutionException e) {
+                    failure = failureOf(e);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    failure = new PatchEngineException(
+                        "[VeltisMinecraft] Library downloads interrupted", e);
+                }
             }
+            if (failure != null) {
+                // Fast fail: cancel everything in flight and abort the shared
+                // HttpClient so a transfer stuck in send() stops promptly, then
+                // surface the first failure with the sequential path's evidence.
+                for (var pending : futures) {
+                    if (!pending.isDone()) {
+                        pending.cancel(true);
+                    }
+                }
+                client.close();
+                throw failure;
+            }
+        } finally {
+            executor.shutdownNow();
         }
         return fetched;
+    }
+
+    /**
+     * Unwraps a task failure into the {@link PatchEngineException} the
+     * sequential path would have thrown, so the parallel and sequential paths
+     * report the same way.
+     */
+    private PatchEngineException failureOf(ExecutionException e) {
+        var cause = e.getCause();
+        if (cause instanceof PatchEngineException patchEngine) {
+            return patchEngine;
+        }
+        if (cause != null && cause.getMessage() != null) {
+            return new PatchEngineException("[VeltisMinecraft] Failed to download libraries"
+                + "\n  Reason: " + cause.getMessage(), cause);
+        }
+        return new PatchEngineException(
+            "[VeltisMinecraft] Failed to download libraries", e);
     }
 
     /**
