@@ -448,7 +448,7 @@ class GradlePipelineTest {
                 + " abbreviation: " + fullSha);
         assertEquals(fullSha.substring(0, 7), shortSha,
             "the seven-character id must be the first seven of the full SHA");
-        assertTrue(java.util.Set.of("stable", "beta", "nightly").contains(channel),
+        assertTrue(java.util.Set.of("pre-alpha", "alpha", "beta", "release").contains(channel),
             "the channel must be one of the supported names, never inferred: " + channel);
         assertEquals("Veltis " + minecraft + " " + channel + " " + shortSha + ".jar", artifact,
             "the release name is exactly Veltis <MinecraftVersion> <Channel> <7-char-SHA>.jar,"

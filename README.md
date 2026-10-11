@@ -93,7 +93,7 @@ output derives from it:
 | Value | Source | Default |
 |---|---|---|
 | Minecraft version | `-PminecraftVersion` / `gradle.properties` | `26.3` |
-| Release channel | `-Pchannel` / `gradle.properties` | `nightly` |
+| Release channel | `-Pchannel` / `gradle.properties` | `pre-alpha` |
 | Commit | `GITHUB_SHA`, then `git rev-parse HEAD` | the checked-out revision |
 
 `buildVeltisMC` writes exactly one runnable artifact, always at the same path:
@@ -103,9 +103,9 @@ build/distributions/veltis.jar
 ```
 
 The local name is deliberately constant: a start script never has to know the
-channel or the commit, and stable, beta and nightly builds all land on the same
-file. The channel- and commit-qualified name is applied only when the artifact is
-published, so it never becomes a second jar in `build/distributions/`:
+channel or the commit, and pre-alpha, beta and release builds all land on the
+same file. The channel- and commit-qualified name is applied only when the
+artifact is published, so it never becomes a second jar in `build/distributions/`:
 
 ```text
 Veltis <MinecraftVersion> <Channel> <7-char-commit>.jar
@@ -114,7 +114,7 @@ Veltis <MinecraftVersion> <Channel> <7-char-commit>.jar
 For example, on the CI release page:
 
 ```text
-Veltis 26.3 nightly 0123456.jar
+Veltis 26.3 pre-alpha 0123456.jar
 ```
 
 That spaced string is the release **title**; a release asset cannot keep it.
@@ -123,14 +123,14 @@ outside `[A-Za-z0-9_+@-]` become dots -- so the file the release actually stores
 is:
 
 ```text
-Veltis.26.3.nightly.0123456.jar
+Veltis.26.3.pre-alpha.0123456.jar
 ```
 
 The channel is explicit and is never inferred from the commit or the branch;
 build a different channel with `-Pchannel`:
 
 ```bash
-./gradlew buildVeltisMC -Pchannel=stable
+./gradlew buildVeltisMC -Pchannel=release
 ```
 
 The same build writes `build/metadata/build-metadata.json`, the
@@ -140,13 +140,13 @@ release title, `assetName` is the same file as a GitHub release stores it, and
 
 ```json
 {
-  "channel": "nightly",
+  "channel": "pre-alpha",
   "version": "1.0.0-SNAPSHOT",
   "minecraftVersion": "26.3",
   "commit": "0123456789abcdef0123456789abcdef01234567",
   "shortCommit": "0123456",
-  "artifact": "Veltis 26.3 nightly 0123456.jar",
-  "assetName": "Veltis.26.3.nightly.0123456.jar",
+  "artifact": "Veltis 26.3 pre-alpha 0123456.jar",
+  "assetName": "Veltis.26.3.pre-alpha.0123456.jar",
   "distributionArtifact": "veltis.jar",
   "minimumJavaVersion": 25
 }
@@ -212,9 +212,9 @@ a channel, which is passed to Gradle as `-Pchannel`, so the release name, the
 metadata and the published asset are one value.
 
 Every build gets its own release, tagged `veltis-<channel>-<minecraft>-<sha>`, so
-each channel keeps a real history and the download URL is permanent. Non-stable
-channels are marked as prereleases, so the website can tell them apart even when
-it reads the releases API.
+each channel keeps a real history and the download URL is permanent. Every
+channel except the official `release` line is marked as a prerelease, so the
+website can tell them apart even when it reads the releases API.
 
 After the release asset exists, the workflow dispatches the metadata plus the
 durable download URL to the website repository with a `veltis-release` repository
